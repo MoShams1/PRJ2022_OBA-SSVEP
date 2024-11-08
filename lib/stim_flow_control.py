@@ -30,13 +30,18 @@ def config_mon_macair():
     return monitor
 
 
-def config_mon_dell():
+def config_mon_dell(res=(1920, 1080)):
     monitor = monitors.Monitor('prim_mon', width=52, distance=70)
-    monitor.setSizePix([1920, 1080])
+    monitor.setSizePix(res)
+    return monitor
+
+def config_mon_asus(res=(1920, 1080)):
+    monitor = monitors.Monitor('prim_mon', width=52, distance=70)
+    monitor.setSizePix(res)
     return monitor
 
 
-def config_win(mon, fullscr, screen):
+def config_win(mon, fullscr, screen, win_size=(1920, 1080)):
     if fullscr:
         win = visual.Window(monitor=mon,
                             screen=screen,
@@ -47,7 +52,7 @@ def config_win(mon, fullscr, screen):
     else:
         win = visual.Window(monitor=mon,
                             units='deg',
-                            size=[1920, 700],
+                            size=win_size,
                             pos=[0, 0],
                             color=[0, 0, 0])
     win.mouseVisible = False

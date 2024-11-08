@@ -49,6 +49,6 @@ for i_image in [0, 1]:
                     image[i, j, :] = colors[i_image]
 
     # Save the image as a transparent PNG file using matplotlib
-    plt.imsave(f"random_dots/patch{i_image + 1}.png",
+    plt.imsave(f"patch{i_image + 1}.png",
                image, format="png", cmap="gray",
                vmin=0, vmax=255, origin='upper')

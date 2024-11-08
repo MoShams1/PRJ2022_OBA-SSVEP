@@ -32,91 +32,120 @@ pd.options.mode.chained_assignment = None  # default='warn'
 # /// INSERT SESSION'S META DATA ///
 
 subID = "test"
-N_BLOCKS = 2  # (2)
-N_TRIALS = 32  # (32) number of trials per block (must be a factor of FOUR)
+connect2ECI = False  # True/False
 screen_num = 1  # 0: ctrl room    1: test room
 full_screen = True  # (True/False)
+monitor_name = 'dell'  # dell/asus/mac
 netstation = True  # (True/False) decide whether to connect with NetStation
 keyboard = "numpad"  # numpad/mac
 freq1 = 12
 freq2 = 7.5
 
 # ----------------------------------------------------------------------------
-# /// CONFIGURE LOAD/SAVE FILES & DIRECTORIES ///
+# /// CONFIGURATION ///
+
+# create file name
+date = sfc.get_date()
+time = sfc.get_time()
+
+image_root = os.path.join("image", "cyc03")
+output_name = f"cyc03_exp01_FBA_{date}_{time}_{subID}.json"
+
+# set data directory
+save_path = os.path.join("..", "data", "cyc03", output_name)
 
 # find out the last recorded block number
-# todo: get rid of temp.json stuff. we don't have to split the task enymore
-temp_data = 'temp.json'
-try:
-    # read from file
-    df = pd.read_json(temp_data)
-    # read file name
-    file_name = df.file_name[0]
-    # update the block number
-    iblock = df['last_block_num'][0] + 1
-    df['last_block_num'][0] = iblock
-    # write to file
-    df.to_json(temp_data)
-except:
-    iblock = 1
-    # create file name
-    date = sfc.get_date()
-    time = sfc.get_time()
-    file_name = f"{subID}_{date}_{time}_exp01_fba_cnt.json"
-    # create a dictionary of variables to be saved
-    trial_dict = {'last_block_num': [iblock],
-                  'file_name': [file_name]}
-    # convert to data frame
-    df = pd.DataFrame(trial_dict)
-    # Note: saving is postponed to the end of the first trial
+# todo: make sure if we need the temp.json file and if we need to pause
+#  recording after each block
+# temp_data = 'temp.json'
+# try:
+# read from file
+# df = pd.read_json(temp_data)
+# read file name
+# file_name = df.file_name[0]
+# update the block number
+# iblock = df['last_block_num'][0] + 1
+# df['last_block_num'][0] = iblock
+# write to file
+# df.to_json(temp_data)
+# except:
+#     iblock = 1
+#     create file name
+# date = sfc.get_date()
+# time = sfc.get_time()
+# file_name = f"{subID}_{date}_{time}_exp01_fba_cnt.json"
+# create a dictionary of variables to be saved
+# trial_dict = {'last_block_num': [iblock],
+#               'file_name': [file_name]}
+# convert to data frame
+# df = pd.DataFrame(trial_dict)
+# Note: saving is postponed to the end of the first trial
 
-# todo: check the save path, image source, make it all in cycle 02
-# set data directory
-data_path = os.path.join("", "data", "raw", file_name)
-# set image root directory
-image_root = os.path.join("image", "image_set_exp01")
 # ----------------------------------------------------------------------------
-
 # /// CONFIGURE ECI CONNECTION ///
-# todo: make connection to the eci system conditional to allow testing the
-#  stimulus without connecting to that system
-# initialize netstation at the beginning of the first block
-if netstation:
-    # Set an IP address for the computer running NetStation as an IPv4 string
-    IP_ns = '10.10.10.42'
-    # Set a port that NetStation will be listening to as an integer
-    port_ns = 55513
-    ns = NetStation(IP_ns, port_ns)
-    # Set an NTP clock server (the amplifier) address as an IPv4 string
-    IP_amp = '10.10.10.51'
-    ns.connect(ntp_ip=IP_amp)
-    # Begin recording
-    ns.begin_rec()
-else:
-    ns = None
+if connect2ECI:
+    # initialize netstation at the beginning of the first block
+    if netstation:
+        # Set an IP address for the computer running NetStation as an IPv4 string
+        IP_ns = '10.10.10.42'
+        # Set a port that NetStation will be listening to as an integer
+        port_ns = 55513
+        ns = NetStation(IP_ns, port_ns)
+        # Set an NTP clock server (the amplifier) address as an IPv4 string
+        IP_amp = '10.10.10.51'
+        ns.connect(ntp_ip=IP_amp)
+        # Begin recording
+        ns.begin_rec()
+    else:
+        ns = None
 
 # ----------------------------------------------------------------------------
+# /// SET STIMULUS PARAMETERS ///
 
-# /// CONFIGURE STIMULUS PARAMETERS AND INPUTS ///
+# todo: add Asus computer
+ref_rate = 60
+trial_duration = 7 * ref_rate  # duration of a trial [frames]
 
-# initialize the display and the keyboard
-# todo: make the referesh rate monitor dependent (dell vs. asus)
-REF_RATE = 60
-TRIAL_DUR = 7 * REF_RATE  # duration of a trial [frames]
-ITI_DUR = 2 * REF_RATE  # inter-trial interval [frames]
+win = []
+if monitor_name == 'dell':
+    mon = sfc.config_mon_dell()
+    win_testSize = (1920, 700)
+    win = sfc.config_win(mon=mon, fullscr=full_screen,
+                         screen=screen_num, win_size=win_testSize)
 
-# configure the monitor and the stimulus window
-# todo: configure the asus monitor conditionally
-mon = sfc.config_mon_dell()
-win = sfc.config_win(mon=mon, fullscr=full_screen, screen=screen_num)
-sfc.test_refresh_rate(win, REF_RATE)
+sfc.test_refresh_rate(win, ref_rate)
 
-# fixation cross
-FIX_SIZE = .5
-FIX_X = 0
-FIX_Y = 0
+fixmark_radius = .5
+fixmark_x = 0
+fixmark_y = 0
 
-INSTRUCT_DUR = REF_RATE  # duration of the instruction period [frames]
+cue_radius = .5
+cue_array_base = [1, 2]
+
+tilt_array_base = [1, 2]
+tilt_duration_frames = int(ref_rate / 2)
+
+size_factor = 5
+image1_size = np.array([size_factor, size_factor])
+image2_size = np.array([size_factor, size_factor])
+image3_size = np.array([size_factor, size_factor])
+
+# opacity (1: opac | 0: transparent)
+image1_trans = .5  # image1 (blue) is always on top
+image2_trans = .6  # image2 (red) is always behind
+
+# jittering properties
+jitter_repetition = int(ref_rate / 5)  # number of frames where the relevant
+# images keep their positions (equal to 50 ms)
+
+rel_imgpath_n = trial_duration // jitter_repetition + 1
+rel_imgpath_sigma = .0002
+rel_imgpath_step = .0003
+
+rel_image_pos0_x = fixmark_x
+rel_image_pos0_y = fixmark_y
+
+gap_dur_list = range(int(ref_rate / 2), ref_rate + 1, 1)
 
 if keyboard == "numpad":
     command_keys = {"quit_key": "backspace", "response_key": "num_0"}
@@ -125,65 +154,50 @@ elif keyboard == "mac":
 else:
     raise NameError(f"Keyboard name '{keyboard}' not recognized.")
 
-# duration of changed-image [frames]
-TILT_DUR = int(REF_RATE / 2)  # equal to 500 ms
-
-# size [deg]
-size_factor = 5
-IMAGE1_SIZE = np.array([size_factor, size_factor])
-IMAGE2_SIZE = np.array([size_factor, size_factor])
-IMAGE3_SIZE = np.array([size_factor, size_factor])
-
-# opacity (1: opac | 0: transparent)
-image1_trans = .5  # image1 (blue) is always on top
-image2_trans = .6  # image2 (red) is always behind
-
-# jittering properties
-JITTER_REPETITION = int(REF_RATE / 5)  # number of frames where the relevant
-# images keep their positions (equal to 50 ms)
-
-REL_IMGPATH_N = TRIAL_DUR // JITTER_REPETITION + 1
-REL_IMGPATH_SIGMA = .0002
-REL_IMGPATH_STEP = .0003
-
-REL_IMAGE_POS0_X = FIX_X
-REL_IMAGE_POS0_Y = FIX_Y
-
-# potential gap durations (0.5 to 1 sec)
-gap_dur_list = range(int(REF_RATE / 2), REF_RATE + 1, 1)
-
-# define a timer to measure the change-detection reaction time
 timer = core.Clock()
 
-# show a message before the block begins
-sfc.block_msg(win, iblock, N_BLOCKS, command_keys)
+# todo: check the block message
+# sfc.block_msg(win, iblock, N_BLOCKS, command_keys)
 
-# hide the cursor
 mouse = event.Mouse(win=win, visible=False)
-# calculate the first trial number of the current block
-acc_trial = (iblock - 1) * N_TRIALS
-
-# create an equal number of trials per condition in current block
-n_trials_per_cnd = int(N_TRIALS / 2)
-cnd_array = np.hstack([np.ones(n_trials_per_cnd, dtype=int) * 1,
-                       np.ones(n_trials_per_cnd, dtype=int) * 2])
-np.random.shuffle(cnd_array)
+# todo: calculate the first trial number of the current block
+# acc_trial = (iblock - 1) * N_TRIALS
+acc_trial = 0
 
 # ----------------------------------------------------------------------------
+# /// CONDITIONS ///
+ncnds = 2 * 2
+# ncnds = 2 cue x 2 tilt
 
+cue_array = np.repeat(cue_array_base, 2)
+tilt_array = np.tile(tilt_duration_frames, 2)
+
+rep_per_cnd = 25
+cue_array = np.repeat(cue_array, rep_per_cnd)
+tilt_array = np.repeat(tilt_array, rep_per_cnd)
+
+ntrials = ncnds * rep_per_cnd
+ind_shuffle = np.arange(ntrials)
+np.random.shuffle(ind_shuffle)
+cue_array = cue_array[ind_shuffle]
+tilt_array = tilt_array[ind_shuffle]
+
+assert (cue_array.size == ntrials)
+assert (tilt_array.size == ntrials)
+
+# ----------------------------------------------------------------------------
 # /// TRIAL BEGINS ///
 
-for itrial in range(N_TRIALS):
+for itrial in range(ntrials):
     iblue = 1
     ired = 1
 
     # /// set up the stimulus behavior in current trial
-
     acc_trial += 1
     print(f"[Trial {acc_trial:03d}]   ", end="")
     if acc_trial > 1:
         # read current running performance
-        df_temp = pd.read_json(data_path)
+        df_temp = pd.read_json(save_path)
         prev_run_perf = df_temp.loc[acc_trial - 2, 'running_performance']
         prev_tilt_mag = df_temp.loc[acc_trial - 2, 'tilt_magnitude']
     else:
@@ -191,7 +205,7 @@ for itrial in range(N_TRIALS):
         prev_tilt_mag = None
 
     # randomly select frames, in which change happens
-    change_start_frames = gen_events.gen_events2(REF_RATE)
+    change_start_frames = gen_events.gen_events2(ref_rate)
     n_total_evnts = len(change_start_frames)
     change_frames = np.array(change_start_frames)
     change_times = np.empty((n_total_evnts,))
@@ -199,74 +213,56 @@ for itrial in range(N_TRIALS):
     response_times = [np.nan]
 
     for i in change_start_frames:
-        for j in range(TILT_DUR - 1):
+        for j in range(tilt_duration_frames - 1):
             change_frames = \
                 np.hstack((change_frames, [i + j + 1]))
 
-    # extract current trial's condition
-    cnd = cnd_array[itrial - 1]
-    print(f"Cnd: {cnd}   #Events: {n_total_evnts}   ", end="")
-
-    # randomly decide on gap duration
     gap_dur = random.choice(gap_dur_list)
 
-    # decide on the cue/target image
-    if cnd == 1:
-        cue_image = 1
-    elif cnd == 2:
-        cue_image = 2
-    else:
-        cue_image = None
-        print("Invalid condition number!")
+    irr_image1_nframes = ref_rate / freq1
+    irr_image2_nframes = ref_rate / freq2
 
-    IRR_IMAGE1_nFRAMES = REF_RATE / freq1
-    IRR_IMAGE2_nFRAMES = REF_RATE / freq2
-
-    # pick the tilting image for each event , independently of the cued image
-    tilt_images = np.random.choice([1, 2], n_total_evnts)
-    # pick the tilting direction for each event
+    cue_image = cue_array[itrial]
+    tilt_image = tilt_array[itrial]
     tilt_dirs = np.random.choice(['CW', 'CCW'], n_total_evnts)
 
     # --------------------------------
-    # set image properties and load
     image1_directory = os.path.join(image_root, f"blue{iblue}_tilt0.png")
     image2_directory = os.path.join(image_root, f"red{ired}_tilt0.png")
-    # load image
     rel_image1 = visual.ImageStim(win,
                                   image=image1_directory,
-                                  size=IMAGE1_SIZE,
+                                  size=image1_size,
                                   opacity=image1_trans)
     rel_image2 = visual.ImageStim(win,
                                   image=image2_directory,
-                                  size=IMAGE2_SIZE,
+                                  size=image2_size,
                                   opacity=image2_trans)
 
     # --------------------------------
-
     # generate the brownian path
     path1_x = gen_path.brownian_2d(
-        n_samples=REL_IMGPATH_N,
-        distribution_sigma=REL_IMGPATH_SIGMA,
-        max_step=REL_IMGPATH_STEP) + REL_IMAGE_POS0_X
+        n_samples=rel_imgpath_n,
+        distribution_sigma=rel_imgpath_sigma,
+        max_step=rel_imgpath_step) + rel_image_pos0_x
     path1_y = gen_path.brownian_2d(
-        n_samples=REL_IMGPATH_N,
-        distribution_sigma=REL_IMGPATH_SIGMA,
-        max_step=REL_IMGPATH_STEP) + REL_IMAGE_POS0_Y
+        n_samples=rel_imgpath_n,
+        distribution_sigma=rel_imgpath_sigma,
+        max_step=rel_imgpath_step) + rel_image_pos0_y
 
     path2_x = gen_path.brownian_2d(
-        n_samples=REL_IMGPATH_N,
-        distribution_sigma=REL_IMGPATH_SIGMA,
-        max_step=REL_IMGPATH_STEP) + REL_IMAGE_POS0_X
+        n_samples=rel_imgpath_n,
+        distribution_sigma=rel_imgpath_sigma,
+        max_step=rel_imgpath_step) + rel_image_pos0_x
     path2_y = gen_path.brownian_2d(
-        n_samples=REL_IMGPATH_N,
-        distribution_sigma=REL_IMGPATH_SIGMA,
-        max_step=REL_IMGPATH_STEP) + REL_IMAGE_POS0_Y
+        n_samples=rel_imgpath_n,
+        distribution_sigma=rel_imgpath_sigma,
+        max_step=rel_imgpath_step) + rel_image_pos0_y
 
     # slow down the jittering speed by reducing the position change rate
-    path1_x = np.repeat(path1_x, JITTER_REPETITION)
-    path1_y = np.repeat(path1_y, JITTER_REPETITION)
-    path2_x = np.repeat(path2_x, JITTER_REPETITION)
-    path2_y = np.repeat(path2_y, JITTER_REPETITION)
+    path1_x = np.repeat(path1_x, jitter_repetition)
+    path1_y = np.repeat(path1_y, jitter_repetition)
+    path2_x = np.repeat(path2_x, jitter_repetition)
+    path2_y = np.repeat(path2_y, jitter_repetition)
 
     if acc_trial == 1:
         tilt_mag = 50
@@ -294,19 +290,19 @@ for itrial in range(N_TRIALS):
 
     rel_image3_1cw = visual.ImageStim(win,
                                       image=image3_directory1cw,
-                                      size=IMAGE3_SIZE,
+                                      size=image3_size,
                                       opacity=image1_trans)
     rel_image3_1ccw = visual.ImageStim(win,
                                        image=image3_directory1ccw,
-                                       size=IMAGE3_SIZE,
+                                       size=image3_size,
                                        opacity=image1_trans)
     rel_image3_2cw = visual.ImageStim(win,
                                       image=image3_directory2cw,
-                                      size=IMAGE3_SIZE,
+                                      size=image3_size,
                                       opacity=image2_trans)
     rel_image3_2ccw = visual.ImageStim(win,
                                        image=image3_directory2ccw,
-                                       size=IMAGE3_SIZE,
+                                       size=image3_size,
                                        opacity=image2_trans)
     # --------------------------------
 
@@ -320,7 +316,7 @@ for itrial in range(N_TRIALS):
 
     # cue period
     cue_yoffset = 0
-    for iframe_instruction in range(INSTRUCT_DUR):
+    for iframe_instruction in range(instruct_dur):
         if cue_image == 1:
             rel_image1.pos = (0, cue_yoffset)
             rel_image1.draw()
@@ -332,8 +328,8 @@ for itrial in range(N_TRIALS):
     # run gap period
     for igap in range(random.choice(gap_dur_list)):
         # todo: create all object before the presentation loop
-        sfc.draw_fixdot(win=win, size=FIX_SIZE,
-                        pos=(FIX_X, FIX_Y),
+        sfc.draw_fixdot(win=win, size=fixmark_radius,
+                        pos=(fixmark_x, fixmark_y),
                         cue=cue_image)
         win.flip()
 
@@ -345,7 +341,7 @@ for itrial in range(N_TRIALS):
         # send a trigger to indicate beginning of each trial
         ns.send_event(event_type=f"CND{cnd}",
                       label=f"CND{cnd}")
-    for iframe in range(TRIAL_DUR):
+    for iframe in range(trial_duration):
         pressed_key = event.getKeys(keyList=list(command_keys.values()))
         # set the position of each task-relevant image
         rel_image1.pos = (path1_x[iframe], path1_y[iframe])
@@ -396,8 +392,8 @@ for itrial in range(N_TRIALS):
             if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
                 rel_image1.draw()
 
-        sfc.draw_fixdot(win=win, size=FIX_SIZE,
-                        pos=(FIX_X, FIX_Y),
+        sfc.draw_fixdot(win=win, size=fixmark_radius,
+                        pos=(fixmark_x, fixmark_y),
                         cue=cue_image)
         win.flip()
 
@@ -421,34 +417,35 @@ for itrial in range(N_TRIALS):
               end="")
 
     # --------------------------------
+    # /// save trial parameters
 
-    # /// prepare data for saving
-    # todo: make saving conditional
-    # create a dictionary of variables to be saved
-    trial_dict = {'trial_num': [acc_trial],
-                  'block_num': [iblock],
-                  'condition_num': [cnd],
-                  'Frequency_tags': [[freq1, freq2]],
-                  'cued_image': [cue_image],
-                  'n_events': n_total_evnts,
-                  'tilted_images': [tilt_images],
-                  'tilt_directions': [tilt_dirs],
-                  'tilt_magnitude': [tilt_mag],
-                  'avg_rt': [avg_rt],
-                  'instant_performance': [instant_perf],
-                  'cummulative_performance': [np.nan],
-                  'running_performance': [np.nan]}
-    # convert to data frame
-    dfnew = pd.DataFrame(trial_dict)
-    # if not first trial, load the existing data frame and concatenate
-    if acc_trial == 1:
-        df.to_json(temp_data)  # to keep a record of the block number
-    else:
-        df = pd.read_json(data_path)
-        dfnew = pd.concat([df, dfnew], ignore_index=True)
+    if subID != 'test':
+        # todo: make saving conditional
+        trial_dict = {
+            'trial_num': [acc_trial],
+            'condition_num': [cnd],
+            'Frequency_tags': [[freq1, freq2]],
+            'cued_image': [cue_image],
+            'n_events': n_total_evnts,
+            'tilted_images': [tilt_images],
+            'tilt_directions': [tilt_dirs],
+            'tilt_magnitude': [tilt_mag],
+            'avg_rt': [avg_rt],
+            'instant_performance': [instant_perf],
+            'cummulative_performance': [np.nan],
+            'running_performance': [np.nan]
+        }
+
+        dfnew = pd.DataFrame(trial_dict)
+        if itrial > 0:
+            df = pd.read_json(save_path)
+            dfnew = pd.concat([df, dfnew], ignore_index=True)
+        dfnew.to_json(save_path)
+
+        if itrial == ntrials - 1:
+            sfc.end_screen(win, color='white')
 
     # --------------------------------
-
     # /// calculate cummulative and running performances
 
     # calculate the cumulative performance (all recorded trials)
@@ -461,34 +458,17 @@ for itrial in range(N_TRIALS):
     print(f"RunPerf:{run_perf:6.2f}%")
     # fill the remaining values in the data frame
     dfnew.loc[acc_trial - 1,
-              ['cummulative_performance',
-               'running_performance']] = [cum_perf, run_perf]
-    # save the data frame
-    dfnew.to_json(data_path)
+    ['cummulative_performance',
+     'running_performance']] = [cum_perf, run_perf]
+    dfnew.to_json(save_path)
 
-    # gap period (0.5 sec)
-    for igap in np.arange(REF_RATE/2):
+    for igap in np.arange(ref_rate / 2):
         win.flip()
 
 # --------------------------------
-
-# /// STOP/PAUSE ECI
-# todo: make the disconnection conditional
-# todo: no pause is needed, only stop
-if iblock == N_BLOCKS:
-    # remove the temorary file
-    os.remove(temp_data)
-    # disconnect the amplifier
+if connect2ECI:
     if netstation:
         ns.disconnect()
-    print(f"\n    *** Run finished and recording stopped ***")
-    print('\n=======================================================')
-
-else:
-    if netstation:
-        ns.end_rec()
-    print(f"\n    Block {iblock} out of {N_BLOCKS} "
-          f"finished and recording paused...")
-    print('\n=======================================================')
+    print(f"\n    *** Recording finished ***")
 
 win.close()
