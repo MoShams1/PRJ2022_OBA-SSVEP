@@ -25,6 +25,8 @@ from psychopy import event, visual, core
 from lib.evaluate_responses import eval_resp
 from egi_pynetstation.NetStation import NetStation
 
+# from stimulus.archive.exp01_v1 import full_screen
+
 # disable Panda's false warning message
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -34,9 +36,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 subID = "test"
 connect2ECI = False  # True/False
 screen_num = 1  # 0: ctrl room    1: test room
-full_screen = True  # (True/False)
 monitor_name = 'dell'  # dell/asus/mac
-netstation = True  # (True/False) decide whether to connect with NetStation
 keyboard = "numpad"  # numpad/mac
 freq1 = 12
 freq2 = 7.5
@@ -84,20 +84,18 @@ save_path = os.path.join("..", "data", "cyc03", output_name)
 # ----------------------------------------------------------------------------
 # /// CONFIGURE ECI CONNECTION ///
 if connect2ECI:
-    # initialize netstation at the beginning of the first block
-    if netstation:
-        # Set an IP address for the computer running NetStation as an IPv4 string
-        IP_ns = '10.10.10.42'
-        # Set a port that NetStation will be listening to as an integer
-        port_ns = 55513
-        ns = NetStation(IP_ns, port_ns)
-        # Set an NTP clock server (the amplifier) address as an IPv4 string
-        IP_amp = '10.10.10.51'
-        ns.connect(ntp_ip=IP_amp)
-        # Begin recording
-        ns.begin_rec()
-    else:
-        ns = None
+    # Set an IP address for the computer running NetStation as an IPv4 string
+    IP_ns = '10.10.10.42'
+    # Set a port that NetStation will be listening to as an integer
+    port_ns = 55513
+    ns = NetStation(IP_ns, port_ns)
+    # Set an NTP clock server (the amplifier) address as an IPv4 string
+    IP_amp = '10.10.10.51'
+    ns.connect(ntp_ip=IP_amp)
+    # Begin recording
+    ns.begin_rec()
+else:
+    ns = None
 
 # ----------------------------------------------------------------------------
 # /// SET STIMULUS PARAMETERS ///
@@ -106,6 +104,8 @@ if connect2ECI:
 ref_rate = 60
 trial_duration = 7 * ref_rate  # duration of a trial [frames]
 
+if subID == 'test':
+    full_screen = True
 win = []
 if monitor_name == 'dell':
     mon = sfc.config_mon_dell()
@@ -116,13 +116,14 @@ if monitor_name == 'dell':
 sfc.test_refresh_rate(win, ref_rate)
 
 fixmark_radius = .5
+fixmark_color = 'black'
 fixmark_x = 0
 fixmark_y = 0
 
 cue_radius = .5
 cue_array_base = [1, 2]
 
-tilt_array_base = [1, 2]
+tilt_array_base = [0, 0, 1]
 tilt_duration_frames = int(ref_rate / 2)
 
 size_factor = 5
@@ -166,13 +167,13 @@ acc_trial = 0
 
 # ----------------------------------------------------------------------------
 # /// CONDITIONS ///
-ncnds = 2 * 2
-# ncnds = 2 cue x 2 tilt
+ncnds = 2 * 3
+# ncnds = 2 cue x 3 tilt (2x w/o tilt and 1x w/ tilt)
 
-cue_array = np.repeat(cue_array_base, 2)
-tilt_array = np.tile(tilt_duration_frames, 2)
+cue_array = np.repeat(cue_array_base, 3)
+tilt_array = np.tile(tilt_array_base, 2)
 
-rep_per_cnd = 25
+rep_per_cnd = 15
 cue_array = np.repeat(cue_array, rep_per_cnd)
 tilt_array = np.repeat(tilt_array, rep_per_cnd)
 
@@ -205,6 +206,7 @@ for itrial in range(ntrials):
         prev_tilt_mag = None
 
     # randomly select frames, in which change happens
+    # todo: make sure the number of events is 2/3 of the times
     change_start_frames = gen_events.gen_events2(ref_rate)
     n_total_evnts = len(change_start_frames)
     change_frames = np.array(change_start_frames)
@@ -223,12 +225,12 @@ for itrial in range(ntrials):
     irr_image2_nframes = ref_rate / freq2
 
     cue_image = cue_array[itrial]
-    tilt_image = tilt_array[itrial]
+    tilt_images = np.random.choice([1, 2], n_total_evnts)
     tilt_dirs = np.random.choice(['CW', 'CCW'], n_total_evnts)
 
     # --------------------------------
-    image1_directory = os.path.join(image_root, f"blue{iblue}_tilt0.png")
-    image2_directory = os.path.join(image_root, f"red{ired}_tilt0.png")
+    image1_directory = os.path.join(image_root, f"patch1_tilt0.png")
+    image2_directory = os.path.join(image_root, f"patch2_tilt0.png")
     rel_image1 = visual.ImageStim(win,
                                   image=image1_directory,
                                   size=image1_size,
@@ -237,7 +239,10 @@ for itrial in range(ntrials):
                                   image=image2_directory,
                                   size=image2_size,
                                   opacity=image2_trans)
-
+    fixdot1 = visual.Circle(win,
+                            radius=fixmark_radius,
+                            pos=(fixmark_x, fixmark_y),
+                            fillColor=fixmark_color)
     # --------------------------------
     # generate the brownian path
     path1_x = gen_path.brownian_2d(
@@ -316,7 +321,8 @@ for itrial in range(ntrials):
 
     # cue period
     cue_yoffset = 0
-    for iframe_instruction in range(instruct_dur):
+    # todo: the name is confusing. change it to cue duration
+    for iframe_instruction in range(2 * ref_rate):
         if cue_image == 1:
             rel_image1.pos = (0, cue_yoffset)
             rel_image1.draw()
@@ -337,10 +343,11 @@ for itrial in range(ntrials):
     # todo: create a photo stimuli for trial begin
     # todo: test the photosensors
     timer.reset()
-    if netstation:
+
+    if connect2ECI:
         # send a trigger to indicate beginning of each trial
-        ns.send_event(event_type=f"CND{cnd}",
-                      label=f"CND{cnd}")
+        ns.send_event(event_type=f"CUE{cue_image}",
+                      label=f"CUE{cue_image}")
     for iframe in range(trial_duration):
         pressed_key = event.getKeys(keyList=list(command_keys.values()))
         # set the position of each task-relevant image
@@ -359,37 +366,37 @@ for itrial in range(ntrials):
                 if tilt_images[cur_evnt_n - 1] == 1:
                     rel_image3_1cw.pos = (
                         path1_x[iframe], path1_y[iframe])
-                    if sfc.decide_on_show(iframe, IRR_IMAGE2_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image2_nframes):
                         rel_image2.draw()
-                    if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image1_nframes):
                         rel_image3_1cw.draw()
                 elif tilt_images[cur_evnt_n - 1] == 2:
                     rel_image3_2cw.pos = (
                         path2_x[iframe], path2_y[iframe])
-                    if sfc.decide_on_show(iframe, IRR_IMAGE2_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image2_nframes):
                         rel_image3_2cw.draw()
-                    if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image1_nframes):
                         rel_image1.draw()
             else:
                 if tilt_images[cur_evnt_n - 1] == 1:
                     rel_image3_1ccw.pos = (
                         path1_x[iframe], path1_y[iframe])
-                    if sfc.decide_on_show(iframe, IRR_IMAGE2_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image2_nframes):
                         rel_image2.draw()
-                    if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image1_nframes):
                         rel_image3_1ccw.draw()
                 elif tilt_images[cur_evnt_n - 1] == 2:
                     rel_image3_2ccw.pos = (
                         path2_x[iframe], path2_y[iframe])
-                    if sfc.decide_on_show(iframe, IRR_IMAGE2_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image2_nframes):
                         rel_image3_2ccw.draw()
-                    if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
+                    if sfc.decide_on_show(iframe, irr_image1_nframes):
                         rel_image1.draw()
         # if not, show the unchanged versions
         else:
-            if sfc.decide_on_show(iframe, IRR_IMAGE2_nFRAMES):
+            if sfc.decide_on_show(iframe, irr_image2_nframes):
                 rel_image2.draw()
-            if sfc.decide_on_show(iframe, IRR_IMAGE1_nFRAMES):
+            if sfc.decide_on_show(iframe, irr_image1_nframes):
                 rel_image1.draw()
 
         sfc.draw_fixdot(win=win, size=fixmark_radius,
@@ -423,7 +430,6 @@ for itrial in range(ntrials):
         # todo: make saving conditional
         trial_dict = {
             'trial_num': [acc_trial],
-            'condition_num': [cnd],
             'Frequency_tags': [[freq1, freq2]],
             'cued_image': [cue_image],
             'n_events': n_total_evnts,
@@ -467,8 +473,7 @@ for itrial in range(ntrials):
 
 # --------------------------------
 if connect2ECI:
-    if netstation:
-        ns.disconnect()
+    ns.disconnect()
     print(f"\n    *** Recording finished ***")
 
 win.close()

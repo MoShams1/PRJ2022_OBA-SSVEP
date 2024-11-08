@@ -155,3 +155,15 @@ def gen_image_pairs(nexmp, ntrials):
     np.random.shuffle(allpairs)
     pairs = allpairs[:ntrials]
     return pairs
+
+def end_screen(win, color='black'):
+    msg = 'Experiment finished successfully.\n Thank you!'
+    message = visual.TextStim(win,
+                              text=msg,
+                              color=color,
+                              height=.65,
+                              alignText='center',
+                              pos=(0, 0))
+    for i in range(3 * 60):
+        message.draw()
+        win.flip()
