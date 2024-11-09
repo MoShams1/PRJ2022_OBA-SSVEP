@@ -48,7 +48,7 @@ freq2 = 7.5
 date = sfc.get_date()
 time = sfc.get_time()
 
-image_root = os.path.join("image", "cyc03")
+image_root = os.path.join("image", "cyc03", "FBA")
 output_name = f"cyc03_exp01_FBA_{date}_{time}_{subID}.json"
 
 # set data directory
@@ -101,11 +101,11 @@ else:
 # /// SET STIMULUS PARAMETERS ///
 
 # todo: add Asus computer
-ref_rate = 60
-trial_duration = 7 * ref_rate  # duration of a trial [frames]
+refresh_rate = 60
+trial_duration = 7 * refresh_rate  # duration of a trial [frames]
 
 if subID == 'test':
-    full_screen = True
+    full_screen = False
 win = []
 if monitor_name == 'dell':
     mon = sfc.config_mon_dell()
@@ -113,40 +113,42 @@ if monitor_name == 'dell':
     win = sfc.config_win(mon=mon, fullscr=full_screen,
                          screen=screen_num, win_size=win_testSize)
 
-sfc.test_refresh_rate(win, ref_rate)
+sfc.test_refresh_rate(win, refresh_rate)
 
-fixmark_radius = .5
-fixmark_color = 'black'
+fixmark_radius = .25
+fixmark_color = 'white'
 fixmark_x = 0
 fixmark_y = 0
 
 cue_radius = .5
 cue_array_base = [1, 2]
+cue_color_base = np.array([[255, 50, 50], [0, 153, 255]])
 
 tilt_array_base = [0, 0, 1]
-tilt_duration_frames = int(ref_rate / 2)
+tilt_duration_frames = int(refresh_rate / 2)
 
-size_factor = 5
+size_factor = 10
 image1_size = np.array([size_factor, size_factor])
 image2_size = np.array([size_factor, size_factor])
 image3_size = np.array([size_factor, size_factor])
 
 # opacity (1: opac | 0: transparent)
-image1_trans = .5  # image1 (blue) is always on top
-image2_trans = .6  # image2 (red) is always behind
+# image1_trans = .5  # image1 (blue) is always on top
+# image2_trans = .6  # image2 (red) is always behind
 
 # jittering properties
-jitter_repetition = int(ref_rate / 5)  # number of frames where the relevant
+# jitter_repetition = int(refresh_rate / 5)  # number of frames where the relevant
 # images keep their positions (equal to 50 ms)
 
-rel_imgpath_n = trial_duration // jitter_repetition + 1
-rel_imgpath_sigma = .0002
-rel_imgpath_step = .0003
+# rel_imgpath_n = trial_duration // jitter_repetition + 1
+# rel_imgpath_sigma = .0002
+# rel_imgpath_step = .0003
 
-rel_image_pos0_x = fixmark_x
-rel_image_pos0_y = fixmark_y
+# rel_image_pos0_x = fixmark_x
+# rel_image_pos0_y = fixmark_y
 
-gap_dur_list = range(int(ref_rate / 2), ref_rate + 1, 1)
+gap_durations_base = range(int(.75 * refresh_rate),
+                           int(1.25 * refresh_rate) + 1, 1)
 
 if keyboard == "numpad":
     command_keys = {"quit_key": "backspace", "response_key": "num_0"}
@@ -207,7 +209,7 @@ for itrial in range(ntrials):
 
     # randomly select frames, in which change happens
     # todo: make sure the number of events is 2/3 of the times
-    change_start_frames = gen_events.gen_events2(ref_rate)
+    change_start_frames = gen_events.gen_events2(refresh_rate)
     n_total_evnts = len(change_start_frames)
     change_frames = np.array(change_start_frames)
     change_times = np.empty((n_total_evnts,))
@@ -219,55 +221,57 @@ for itrial in range(ntrials):
             change_frames = \
                 np.hstack((change_frames, [i + j + 1]))
 
-    gap_dur = random.choice(gap_dur_list)
+    iti_dur = random.choice(gap_durations_base)
+    postFixGap_dur = random.choice(gap_durations_base)
 
-    irr_image1_nframes = ref_rate / freq1
-    irr_image2_nframes = ref_rate / freq2
+    irr_image1_nframes = refresh_rate / freq1
+    irr_image2_nframes = refresh_rate / freq2
 
     cue_image = cue_array[itrial]
     tilt_images = np.random.choice([1, 2], n_total_evnts)
     tilt_dirs = np.random.choice(['CW', 'CCW'], n_total_evnts)
 
     # --------------------------------
-    image1_directory = os.path.join(image_root, f"patch1_tilt0.png")
-    image2_directory = os.path.join(image_root, f"patch2_tilt0.png")
-    rel_image1 = visual.ImageStim(win,
-                                  image=image1_directory,
-                                  size=image1_size,
-                                  opacity=image1_trans)
-    rel_image2 = visual.ImageStim(win,
-                                  image=image2_directory,
-                                  size=image2_size,
-                                  opacity=image2_trans)
-    fixdot1 = visual.Circle(win,
+    image1_directory = os.path.join(image_root, f"image1.png")
+    image2_directory = os.path.join(image_root, f"image2.png")
+    image1 = visual.ImageStim(win,
+                              image=image1_directory,
+                              size=image1_size)
+    image2 = visual.ImageStim(win,
+                              image=image2_directory,
+                              size=image2_size)
+    fixmark = visual.Circle(win,
                             radius=fixmark_radius,
                             pos=(fixmark_x, fixmark_y),
-                            fillColor=fixmark_color)
+                            fillColor=cue_color_base[cue_image - 1] / 255)
+    print('===\n')
+    print(cue_color_base[cue_image - 1] / 255)
+    print('===')
     # --------------------------------
-    # generate the brownian path
-    path1_x = gen_path.brownian_2d(
-        n_samples=rel_imgpath_n,
-        distribution_sigma=rel_imgpath_sigma,
-        max_step=rel_imgpath_step) + rel_image_pos0_x
-    path1_y = gen_path.brownian_2d(
-        n_samples=rel_imgpath_n,
-        distribution_sigma=rel_imgpath_sigma,
-        max_step=rel_imgpath_step) + rel_image_pos0_y
-
-    path2_x = gen_path.brownian_2d(
-        n_samples=rel_imgpath_n,
-        distribution_sigma=rel_imgpath_sigma,
-        max_step=rel_imgpath_step) + rel_image_pos0_x
-    path2_y = gen_path.brownian_2d(
-        n_samples=rel_imgpath_n,
-        distribution_sigma=rel_imgpath_sigma,
-        max_step=rel_imgpath_step) + rel_image_pos0_y
-
-    # slow down the jittering speed by reducing the position change rate
-    path1_x = np.repeat(path1_x, jitter_repetition)
-    path1_y = np.repeat(path1_y, jitter_repetition)
-    path2_x = np.repeat(path2_x, jitter_repetition)
-    path2_y = np.repeat(path2_y, jitter_repetition)
+    # # generate the brownian path
+    # path1_x = gen_path.brownian_2d(
+    #     n_samples=rel_imgpath_n,
+    #     distribution_sigma=rel_imgpath_sigma,
+    #     max_step=rel_imgpath_step) + rel_image_pos0_x
+    # path1_y = gen_path.brownian_2d(
+    #     n_samples=rel_imgpath_n,
+    #     distribution_sigma=rel_imgpath_sigma,
+    #     max_step=rel_imgpath_step) + rel_image_pos0_y
+    #
+    # path2_x = gen_path.brownian_2d(
+    #     n_samples=rel_imgpath_n,
+    #     distribution_sigma=rel_imgpath_sigma,
+    #     max_step=rel_imgpath_step) + rel_image_pos0_x
+    # path2_y = gen_path.brownian_2d(
+    #     n_samples=rel_imgpath_n,
+    #     distribution_sigma=rel_imgpath_sigma,
+    #     max_step=rel_imgpath_step) + rel_image_pos0_y
+    #
+    # # slow down the jittering speed by reducing the position change rate
+    # path1_x = np.repeat(path1_x, jitter_repetition)
+    # path1_y = np.repeat(path1_y, jitter_repetition)
+    # path2_x = np.repeat(path2_x, jitter_repetition)
+    # path2_y = np.repeat(path2_y, jitter_repetition)
 
     if acc_trial == 1:
         tilt_mag = 50
@@ -284,75 +288,64 @@ for itrial in range(ntrials):
     print(f"TiltAng: {(tilt_mag / 10):3.1f}deg   ", end="")
 
     # load the changed image
-    image3_directory1cw = os.path.join(image_root,
-                                       f"blue{iblue}_tilt{tilt_mag}_CW.png")
-    image3_directory1ccw = os.path.join(image_root,
-                                        f"blue{iblue}_tilt{tilt_mag}_CCW.png")
-    image3_directory2cw = os.path.join(image_root,
-                                       f"red{ired}_tilt{tilt_mag}_CW.png")
-    image3_directory2ccw = os.path.join(image_root,
-                                        f"red{ired}_tilt{tilt_mag}_CCW.png")
+    # image3_directory1cw = os.path.join(image_root,
+    #                                    f"blue{iblue}_tilt{tilt_mag}_CW.png")
+    # image3_directory1ccw = os.path.join(image_root,
+    #                                     f"blue{iblue}_tilt{tilt_mag}_CCW.png")
+    # image3_directory2cw = os.path.join(image_root,
+    #                                    f"red{ired}_tilt{tilt_mag}_CW.png")
+    # image3_directory2ccw = os.path.join(image_root,
+    #                                     f"red{ired}_tilt{tilt_mag}_CCW.png")
+    #
+    # rel_image3_1cw = visual.ImageStim(win,
+    #                                   image=image3_directory1cw,
+    #                                   size=image3_size,
+    #                                   opacity=image1_trans)
+    # rel_image3_1ccw = visual.ImageStim(win,
+    #                                    image=image3_directory1ccw,
+    #                                    size=image3_size,
+    #                                    opacity=image1_trans)
+    # rel_image3_2cw = visual.ImageStim(win,
+    #                                   image=image3_directory2cw,
+    #                                   size=image3_size,
+    #                                   opacity=image2_trans)
+    # rel_image3_2ccw = visual.ImageStim(win,
+    #                                    image=image3_directory2ccw,
+    #                                    size=image3_size,
+    #                                    opacity=image2_trans)
 
-    rel_image3_1cw = visual.ImageStim(win,
-                                      image=image3_directory1cw,
-                                      size=image3_size,
-                                      opacity=image1_trans)
-    rel_image3_1ccw = visual.ImageStim(win,
-                                       image=image3_directory1ccw,
-                                       size=image3_size,
-                                       opacity=image1_trans)
-    rel_image3_2cw = visual.ImageStim(win,
-                                      image=image3_directory2cw,
-                                      size=image3_size,
-                                      opacity=image2_trans)
-    rel_image3_2ccw = visual.ImageStim(win,
-                                       image=image3_directory2ccw,
-                                       size=image3_size,
-                                       opacity=image2_trans)
     # --------------------------------
-
     # /// run the stimulus
 
     cur_evnt_n = 0
 
-    # gap period
-    for igap in range(random.choice(gap_dur_list)):
+    # inter-trial period
+    for iframe in range(iti_dur):
         win.flip()
 
     # cue period
-    cue_yoffset = 0
-    # todo: the name is confusing. change it to cue duration
-    for iframe_instruction in range(2 * ref_rate):
-        if cue_image == 1:
-            rel_image1.pos = (0, cue_yoffset)
-            rel_image1.draw()
-        else:
-            rel_image2.pos = (0, cue_yoffset)
-            rel_image2.draw()
+    for iframe in range(2 * refresh_rate):
+        fixmark.draw()
         win.flip()
 
-    # run gap period
-    for igap in range(random.choice(gap_dur_list)):
-        # todo: create all object before the presentation loop
-        sfc.draw_fixdot(win=win, size=fixmark_radius,
-                        pos=(fixmark_x, fixmark_y),
-                        cue=cue_image)
-        win.flip()
-
-    # tilt detection period
-    # todo: create a photo stimuli for trial begin
-    # todo: test the photosensors
-    timer.reset()
+    # # run gap period
+    # for iframe in range(postFixGap_dur):
+    #     win.flip()
 
     if connect2ECI:
         # send a trigger to indicate beginning of each trial
         ns.send_event(event_type=f"CUE{cue_image}",
                       label=f"CUE{cue_image}")
+
+    # todo: create a photo stimuli for trial begin
+
     for iframe in range(trial_duration):
+        image1.ori = 0
+        image2.ori = 0
         pressed_key = event.getKeys(keyList=list(command_keys.values()))
         # set the position of each task-relevant image
-        rel_image1.pos = (path1_x[iframe], path1_y[iframe])
-        rel_image2.pos = (path2_x[iframe], path2_y[iframe])
+        # image1.pos = (path1_x[iframe], path1_y[iframe])
+        # image2.pos = (path2_x[iframe], path2_y[iframe])
 
         # get the time of change
         if iframe in change_start_frames:
@@ -364,44 +357,50 @@ for itrial in range(ntrials):
         if iframe in change_frames:
             if tilt_dirs[cur_evnt_n - 1] == 'CW':
                 if tilt_images[cur_evnt_n - 1] == 1:
-                    rel_image3_1cw.pos = (
-                        path1_x[iframe], path1_y[iframe])
+                    image1.ori = -tilt_mag / 10
+                    # rel_image3_1cw.pos = (
+                    #     path1_x[iframe], path1_y[iframe])
                     if sfc.decide_on_show(iframe, irr_image2_nframes):
-                        rel_image2.draw()
+                        image2.draw()
                     if sfc.decide_on_show(iframe, irr_image1_nframes):
-                        rel_image3_1cw.draw()
+                        image1.draw()
+                        # rel_image3_1cw.draw()
                 elif tilt_images[cur_evnt_n - 1] == 2:
-                    rel_image3_2cw.pos = (
-                        path2_x[iframe], path2_y[iframe])
+                    image2.ori = -tilt_mag / 10
+                    # rel_image3_2cw.pos = (
+                    #     path2_x[iframe], path2_y[iframe])
                     if sfc.decide_on_show(iframe, irr_image2_nframes):
-                        rel_image3_2cw.draw()
+                        image2.draw()
+                        # rel_image3_2cw.draw()
                     if sfc.decide_on_show(iframe, irr_image1_nframes):
-                        rel_image1.draw()
+                        image1.draw()
             else:
                 if tilt_images[cur_evnt_n - 1] == 1:
-                    rel_image3_1ccw.pos = (
-                        path1_x[iframe], path1_y[iframe])
+                    image1.ori = tilt_mag / 10
+                    # rel_image3_1ccw.pos = (
+                    #     path1_x[iframe], path1_y[iframe])
                     if sfc.decide_on_show(iframe, irr_image2_nframes):
-                        rel_image2.draw()
+                        image2.draw()
                     if sfc.decide_on_show(iframe, irr_image1_nframes):
-                        rel_image3_1ccw.draw()
+                        image1.draw()
+                        # rel_image3_1ccw.draw()
                 elif tilt_images[cur_evnt_n - 1] == 2:
-                    rel_image3_2ccw.pos = (
-                        path2_x[iframe], path2_y[iframe])
+                    image2.ori = tilt_mag / 10
+                    # rel_image3_2ccw.pos = (
+                    #     path2_x[iframe], path2_y[iframe])
                     if sfc.decide_on_show(iframe, irr_image2_nframes):
-                        rel_image3_2ccw.draw()
+                        image2.draw()
+                        # rel_image3_2ccw.draw()
                     if sfc.decide_on_show(iframe, irr_image1_nframes):
-                        rel_image1.draw()
+                        image1.draw()
         # if not, show the unchanged versions
         else:
             if sfc.decide_on_show(iframe, irr_image2_nframes):
-                rel_image2.draw()
+                image2.draw()
             if sfc.decide_on_show(iframe, irr_image1_nframes):
-                rel_image1.draw()
+                image1.draw()
 
-        sfc.draw_fixdot(win=win, size=fixmark_radius,
-                        pos=(fixmark_x, fixmark_y),
-                        cue=cue_image)
+        fixmark.draw()
         win.flip()
 
         # response period
@@ -412,6 +411,7 @@ for itrial in range(ntrials):
             res_t = timer.getTime()
             response_times.append(round(res_t * 1000))
     response_times.pop(0)
+
     # evaluate the response
     [instant_perf, avg_rt] = eval_resp(cue_image,
                                        tilt_images,
@@ -427,10 +427,9 @@ for itrial in range(ntrials):
     # /// save trial parameters
 
     if subID != 'test':
-        # todo: make saving conditional
         trial_dict = {
             'trial_num': [acc_trial],
-            'Frequency_tags': [[freq1, freq2]],
+            'Frequency_tags': [freq1, freq2],
             'cued_image': [cue_image],
             'n_events': n_total_evnts,
             'tilted_images': [tilt_images],
@@ -454,21 +453,22 @@ for itrial in range(ntrials):
     # --------------------------------
     # /// calculate cummulative and running performances
 
-    # calculate the cumulative performance (all recorded trials)
-    eval_series = dfnew.instant_performance
-    eval_array = eval_series.values
-    cum_perf = round(sum(eval_array) / len(eval_array), 2)
-    print(f"CumPerf:{cum_perf:6.2f}%   ", end="")
-    # calculate the running performance (last 10 trials)
-    run_perf = round(sum(eval_array[-10:]) / len(eval_array[-10:]), 2)
-    print(f"RunPerf:{run_perf:6.2f}%")
-    # fill the remaining values in the data frame
-    dfnew.loc[acc_trial - 1,
-    ['cummulative_performance',
-     'running_performance']] = [cum_perf, run_perf]
-    dfnew.to_json(save_path)
+    if itrial > 0:
+        # calculate the cumulative performance (all recorded trials)
+        eval_series = dfnew.instant_performance
+        eval_array = eval_series.values
+        cum_perf = round(sum(eval_array) / len(eval_array), 2)
+        print(f"CumPerf:{cum_perf:6.2f}%   ", end="")
+        # calculate the running performance over last 10 trials
+        run_perf = round(sum(eval_array[-10:]) / len(eval_array[-10:]), 2)
+        print(f"RunPerf:{run_perf:6.2f}%")
+        # fill the remaining values in the data frame
+        dfnew.loc[acc_trial - 1,
+        ['cummulative_performance', 'running_performance']] = \
+            [cum_perf, run_perf]
+        dfnew.to_json(save_path)
 
-    for igap in np.arange(ref_rate / 2):
+    for iframe in np.arange(refresh_rate / 2):
         win.flip()
 
 # --------------------------------

@@ -48,13 +48,13 @@ def config_win(mon, fullscr, screen, win_size=(1920, 1080)):
                             units='deg',
                             pos=[0, 0],
                             fullscr=fullscr,
-                            color=[0, 0, 0])
+                            color=[-.8, -.8, -.8])
     else:
         win = visual.Window(monitor=mon,
                             units='deg',
                             size=win_size,
                             pos=[0, 0],
-                            color=[0, 0, 0])
+                            color=[-.8, -.8, -.8])
     win.mouseVisible = False
     return win
 
